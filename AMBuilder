@@ -22,9 +22,9 @@ for sdk_target in MMSPlugin.sdk_targets:
                 binary.sources.append(os.path.join(root, _file).replace("\\", "/"))
 
     for root, dirs, files in os.walk(os.path.join(builder.sourcePath, "vendor", "embedder", "src")):
-		for _file in files:
-			if fnmatch.fnmatch(_file, '*.cpp'):
-				binary.sources.append(os.path.join(root, _file).replace("\\", "/"))
+        for _file in files:
+            if fnmatch.fnmatch(_file, '*.cpp'):
+                binary.sources.append(os.path.join(root, _file).replace("\\", "/"))
 
     binary.sources.append(os.path.join(sdk['path'], 'entity2', 'entitysystem.cpp'))
     binary.sources.append(os.path.join(sdk['path'], 'entity2', 'entityidentity.cpp'))
@@ -32,14 +32,14 @@ for sdk_target in MMSPlugin.sdk_targets:
     binary.sources.append(os.path.join(sdk['path'], 'tier1', 'keyvalues3.cpp'))
 
     with open(os.path.join(builder.sourcePath, "vendor", "embedder", "libs", "links.json")) as f:
-		embedder_linking = json.load(f)
+        embedder_linking = json.load(f)
 
-	libs = embedder_linking["libraries"][binary.compiler.target.platform]
-	incls = embedder_linking["includes"]
-	for lib in libs:
-		binary.compiler.postlink += [os.path.join(builder.sourcePath, "vendor", "embedder", "libs", lib)]
-	for incl in incls:
-		binary.compiler.cxxincludes += [os.path.join(builder.sourcePath, 'vendor', 'embedder', 'libs', incl)]
+    libs = embedder_linking["libraries"][binary.compiler.target.platform]
+    incls = embedder_linking["includes"]
+    for lib in libs:
+        binary.compiler.postlink += [os.path.join(builder.sourcePath, "vendor", "embedder", "libs", lib)]
+    for incl in incls:
+        binary.compiler.cxxincludes += [os.path.join(builder.sourcePath, 'vendor', 'embedder', 'libs', incl)]
 
     if binary.compiler.target.platform == 'linux':
         binary.compiler.cxxflags += [
@@ -63,7 +63,7 @@ for sdk_target in MMSPlugin.sdk_targets:
         ]
         binary.compiler.postlink += [
             os.path.join(builder.sourcePath, 'vendor', 'funchook', 'lib', 'libfunchook.a'),
-      		os.path.join(builder.sourcePath, 'vendor', 'funchook', 'lib', 'libdistorm.a'),
+              os.path.join(builder.sourcePath, 'vendor', 'funchook', 'lib', 'libdistorm.a'),
 
             "-lgnutls",
             "-lz",
@@ -105,8 +105,8 @@ for sdk_target in MMSPlugin.sdk_targets:
         ]
         binary.compiler.postlink += [
             os.path.join(builder.sourcePath, 'vendor', 'funchook', 'lib', 'funchook.lib'),
-		    os.path.join(builder.sourcePath, 'vendor', 'funchook', 'lib', 'distorm.lib'),
-      		"psapi.lib",
+            os.path.join(builder.sourcePath, 'vendor', 'funchook', 'lib', 'distorm.lib'),
+              "psapi.lib",
             "winmm.lib",
             "ws2_32.lib",
             "wldap32.lib",
