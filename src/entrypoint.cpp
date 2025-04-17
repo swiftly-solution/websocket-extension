@@ -5,7 +5,6 @@
 ////////////////////////////////////////////////////////////
 
 BaseExtension g_Ext;
-CUtlVector<FuncHookBase *> g_vecHooks;
 CREATE_GLOBALVARS();
 
 //////////////////////////////////////////////////////////////
@@ -13,13 +12,9 @@ CREATE_GLOBALVARS();
 ////////////////////////////////////////////////////////////
 
 EXT_EXPOSE(g_Ext);
-bool BaseExtension::Load(std::string& error, SourceHook::ISourceHook *SHPtr, ISmmAPI* ismm, bool late)
+bool BaseExtension::Load(std::string& error, SourceHook::ISourceHook* SHPtr, ISmmAPI* ismm, bool late)
 {
     SAVE_GLOBALVARS();
-    if(!InitializeHooks()) {
-        error = "Failed to initialize hooks.";
-        return false;
-    }
 
     ismm->ConPrint("Printing a text from extensions land!\n");
     return true;
@@ -27,7 +22,6 @@ bool BaseExtension::Load(std::string& error, SourceHook::ISourceHook *SHPtr, ISm
 
 bool BaseExtension::Unload(std::string& error)
 {
-    UnloadHooks();
     return true;
 }
 

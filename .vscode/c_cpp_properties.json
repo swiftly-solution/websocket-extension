@@ -9,7 +9,8 @@
                 "${workspaceFolder}/alliedmodders/metamod/core/**",
                 "${workspaceFolder}/src/**",
                 "${workspaceFolder}/vendor/**",
-                "${workspaceFolder}/vendor/LuaBridge/Source/**"
+                "${workspaceFolder}/vendor/swiftly-ext/hooks/**",
+                "${workspaceFolder}/vendor/swiftly-ext/hooks/dynohook/**"
             ],
             "defines": [
                 "_DEBUG",
@@ -32,7 +33,8 @@
                 "${workspaceFolder}/alliedmodders/metamod/core/**",
                 "${workspaceFolder}/src/**",
                 "${workspaceFolder}/vendor/**",
-                "${workspaceFolder}/vendor/LuaBridge/Source/**"
+                "${workspaceFolder}/vendor/swiftly-ext/hooks/**",
+                "${workspaceFolder}/vendor/swiftly-ext/hooks/dynohook/**"
             ],
             "defines": [
                 "_DEBUG",
