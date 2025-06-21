@@ -109,7 +109,7 @@ void WSServerMessage(std::vector<std::any> args)
     std::string server_id = std::any_cast<char*>(args[0]);
     uint64_t client_id = std::any_cast<uint64_t>(args[1]);
     std::string kind = std::any_cast<const char*>(args[2]);
-    std::string message = std::any_cast<const char*>(args[3]);
+    std::string message = std::any_cast<std::string>(args[3]);
     bool* finished = std::any_cast<bool*>(args[4]);
 
     std::any ret;
@@ -135,7 +135,7 @@ static int ws_connect_handler(const struct mg_connection* conn, void* user_data)
     const struct mg_request_info* ri = mg_get_request_info(conn);
 
     bool finished = false;
-    g_Ext.NextFrame(WSServerMessage, { (char*)user_data, wsCliCtx->connectionNumber, "open", "", &finished });
+    g_Ext.NextFrame(WSServerMessage, { (char*)user_data, wsCliCtx->connectionNumber, "open", std::string(""), &finished });
     while (!finished) { std::this_thread::sleep_for(std::chrono::milliseconds(50)); }
     return 0;
 }
@@ -145,7 +145,7 @@ static void ws_ready_handler(struct mg_connection* conn, void* user_data)
     struct ClientInfo* wsCliCtx = (struct ClientInfo*)mg_get_user_connection_data(conn);
 
     bool finished = false;
-    g_Ext.NextFrame(WSServerMessage, { (char*)user_data, wsCliCtx->connectionNumber, "ready", "", &finished });
+    g_Ext.NextFrame(WSServerMessage, { (char*)user_data, wsCliCtx->connectionNumber, "ready", std::string(""), &finished });
     while (!finished) { std::this_thread::sleep_for(std::chrono::milliseconds(50)); }
 }
 
@@ -168,7 +168,7 @@ static void ws_close_handler(const struct mg_connection* conn, void* user_data)
     struct ClientInfo* wsCliCtx = (struct ClientInfo*)mg_get_user_connection_data(conn);
 
     bool finished = false;
-    g_Ext.NextFrame(WSServerMessage, { (char*)user_data, wsCliCtx->connectionNumber, "close", "", &finished });
+    g_Ext.NextFrame(WSServerMessage, { (char*)user_data, wsCliCtx->connectionNumber, "close", std::string(""), &finished });
     while (!finished) { std::this_thread::sleep_for(std::chrono::milliseconds(50)); }
 
     std::string uid = (char*)user_data;
