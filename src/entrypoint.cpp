@@ -7,6 +7,7 @@
 #include <thread>
 #include <civetweb/civetweb.h>
 #include <swiftly-ext/event.h>
+#include <atomic>
 
 SH_DECL_HOOK1_void(IServerGameDLL, PreWorldUpdate, SH_NOATTRIB, 0, bool);
 
@@ -124,8 +125,8 @@ static int ws_connect_handler(const struct mg_connection* conn, void* user_data)
         return 1;
     }
 
-    static uint64_t connectionCounter = 0;
-    wsCliCtx->connectionNumber = __sync_add_and_fetch(&connectionCounter, 1);
+    static std::atomic<uint64_t> connectionCounter{ 0 };
+    wsCliCtx->connectionNumber = connectionCounter.fetch_add(1) + 1;
     mg_set_user_connection_data(conn, wsCliCtx);
 
     std::string uid = (char*)user_data;
