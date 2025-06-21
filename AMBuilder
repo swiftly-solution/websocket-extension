@@ -2,8 +2,8 @@ import os
 import fnmatch
 import json
 
-MMSPlugin.plugin_name = 'baseext'
-MMSPlugin.plugin_alias = 'baseext'
+MMSPlugin.plugin_name = 'websockets.ext'
+MMSPlugin.plugin_alias = 'websockets.ext'
 
 for sdk_target in MMSPlugin.sdk_targets:
     sdk = sdk_target.sdk
@@ -30,6 +30,8 @@ for sdk_target in MMSPlugin.sdk_targets:
     binary.sources.append(os.path.join(sdk['path'], 'entity2', 'entityidentity.cpp'))
     binary.sources.append(os.path.join(sdk['path'], 'entity2', 'entitykeyvalues.cpp'))
     binary.sources.append(os.path.join(sdk['path'], 'tier1', 'keyvalues3.cpp'))
+    
+    binary.sources.append(os.path.join(builder.sourcePath, "vendor", "civetweb", "civetweb.c"))
 
     with open(os.path.join(builder.sourcePath, "vendor", "embedder", "libs", "links.json")) as f:
         embedder_linking = json.load(f)
@@ -149,6 +151,8 @@ for sdk_target in MMSPlugin.sdk_targets:
     binary.compiler.defines += [
         "HAVE_STRUCT_TIMESPEC",
         "BUILDING",
+        "NO_SSL",
+        "USE_WEBSOCKET"
     ]
 
     if os.getenv("VERSION") != None:

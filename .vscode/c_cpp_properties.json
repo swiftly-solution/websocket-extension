@@ -3,7 +3,7 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/build/baseext/windows-x86_64/**",
+                "${workspaceFolder}/build/websockets.ext/windows-x86_64/**",
                 "${workspaceFolder}/alliedmodders/hl2sdk/**",
                 "${workspaceFolder}/alliedmodders/metamod/**",
                 "${workspaceFolder}/alliedmodders/metamod/core/**",
@@ -27,7 +27,7 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/build/baseext/linux-x86_64/**",
+                "${workspaceFolder}/build/websockets.ext/linux-x86_64/**",
                 "${workspaceFolder}/alliedmodders/hl2sdk/**",
                 "${workspaceFolder}/alliedmodders/metamod/**",
                 "${workspaceFolder}/alliedmodders/metamod/core/**",

@@ -1,61 +1,315 @@
 #include "entrypoint.h"
+#include <embedder/src/Embedder.h>
+#include <random>
+#include <map>
+#include <string>
+#include <set>
+#include <thread>
+#include <civetweb/civetweb.h>
+#include <swiftly-ext/event.h>
+
+SH_DECL_HOOK1_void(IServerGameDLL, PreWorldUpdate, SH_NOATTRIB, 0, bool);
 
 //////////////////////////////////////////////////////////////
 /////////////////        Core Variables        //////////////
 ////////////////////////////////////////////////////////////
 
-BaseExtension g_Ext;
+struct ClientInfo
+{
+    uint64_t connectionNumber;
+};
+
+static const char subprotocol_bin[] = "Company.ProtoName.bin";
+static const char subprotocol_json[] = "Company.ProtoName.json";
+static const char* subprotocols[] = { subprotocol_bin, subprotocol_json, NULL };
+static struct mg_websocket_subprotocols wsprot = { 2, subprotocols };
+
+WSExtension g_Ext;
 CREATE_GLOBALVARS();
+
+std::map<std::string, struct mg_context*> internalWSServer;
+std::map<std::string, std::map<uint64_t, struct mg_connection*>> wsConnections;
+
+ISource2Server* server = nullptr;
 
 //////////////////////////////////////////////////////////////
 /////////////////          Core Class          //////////////
 ////////////////////////////////////////////////////////////
 
-EXT_EXPOSE(g_Ext);
-bool BaseExtension::Load(std::string& error, SourceHook::ISourceHook* SHPtr, ISmmAPI* ismm, bool late)
+int32_t genrand()
 {
+    static std::random_device rd;
+    static std::mt19937 rng(rd());
+    return std::uniform_int_distribution<int>(0, INT_MAX)(rng);
+}
+
+std::string get_uuid()
+{
+    return string_format(
+        "%04x%04x-%04x-%04x-%04x-%04x%04x%04x",
+        (genrand() & 0xFFFF), (genrand() & 0xFFFF),
+        (genrand() & 0xFFFF),
+        ((genrand() & 0x0fff) | 0x4000),
+        (genrand() % 0x3fff + 0x8000),
+        (genrand() & 0xFFFF), (genrand() & 0xFFFF), (genrand() & 0xFFFF));
+}
+
+EXT_EXPOSE(g_Ext);
+bool WSExtension::Load(std::string& error, SourceHook::ISourceHook* SHPtr, ISmmAPI* ismm, bool late)
+{
+    mg_init_library(0);
     SAVE_GLOBALVARS();
 
-    ismm->ConPrint("Printing a text from extensions land!\n");
+    GET_IFACE_ANY(GetServerFactory, server, ISource2Server, INTERFACEVERSION_SERVERGAMEDLL);
+
+    SH_ADD_HOOK_MEMFUNC(IServerGameDLL, PreWorldUpdate, server, this, &WSExtension::Hook_PreWorldUpdate, true);
+
     return true;
 }
 
-bool BaseExtension::Unload(std::string& error)
+bool WSExtension::Unload(std::string& error)
+{
+    for (auto it = internalWSServer.begin(); it != internalWSServer.end(); ++it) {
+        mg_stop(it->second);
+    }
+
+    SH_REMOVE_HOOK_MEMFUNC(IServerGameDLL, PreWorldUpdate, server, this, &WSExtension::Hook_PreWorldUpdate, true);
+
+    mg_exit_library();
+    return true;
+}
+
+void WSExtension::Hook_PreWorldUpdate(bool simulating)
+{
+    while (!m_nextFrame.empty())
+    {
+        auto pair = m_nextFrame.front();
+        pair.first(pair.second);
+        m_nextFrame.pop_front();
+    }
+}
+
+void WSExtension::NextFrame(std::function<void(std::vector<std::any>)> fn, std::vector<std::any> param)
+{
+    m_nextFrame.push_back({ fn, param });
+}
+
+void WSExtension::AllExtensionsLoaded()
+{
+
+}
+
+void WSExtension::AllPluginsLoaded()
+{
+
+}
+
+void WSServerMessage(std::vector<std::any> args)
+{
+    std::string server_id = std::any_cast<char*>(args[0]);
+    uint64_t client_id = std::any_cast<uint64_t>(args[1]);
+    std::string kind = std::any_cast<const char*>(args[2]);
+    std::string message = std::any_cast<const char*>(args[3]);
+    bool* finished = std::any_cast<bool*>(args[4]);
+
+    std::any ret;
+    TriggerEvent("websockets.ext", "OnWSServerMessage", { server_id, client_id, kind, message }, ret);
+    *finished = true;
+}
+
+static int ws_connect_handler(const struct mg_connection* conn, void* user_data)
+{
+    struct ClientInfo* wsCliCtx = (struct ClientInfo*)calloc(1, sizeof(struct ClientInfo));
+    if (!wsCliCtx) {
+        return 1;
+    }
+
+    static uint64_t connectionCounter = 0;
+    wsCliCtx->connectionNumber = __sync_add_and_fetch(&connectionCounter, 1);
+    mg_set_user_connection_data(conn, wsCliCtx);
+
+    std::string uid = (char*)user_data;
+    if (wsConnections.find(uid) == wsConnections.end()) wsConnections[uid] = std::map<uint64_t, struct mg_connection*>{};
+    wsConnections[uid].insert({ wsCliCtx->connectionNumber, (struct mg_connection*)conn });
+
+    const struct mg_request_info* ri = mg_get_request_info(conn);
+
+    bool finished = false;
+    g_Ext.NextFrame(WSServerMessage, { (char*)user_data, wsCliCtx->connectionNumber, "open", "", &finished });
+    while (!finished) { std::this_thread::sleep_for(std::chrono::milliseconds(50)); }
+    return 0;
+}
+
+static void ws_ready_handler(struct mg_connection* conn, void* user_data)
+{
+    struct ClientInfo* wsCliCtx = (struct ClientInfo*)mg_get_user_connection_data(conn);
+
+    bool finished = false;
+    g_Ext.NextFrame(WSServerMessage, { (char*)user_data, wsCliCtx->connectionNumber, "ready", "", &finished });
+    while (!finished) { std::this_thread::sleep_for(std::chrono::milliseconds(50)); }
+}
+
+static int ws_data_handler(struct mg_connection* conn, int opcode, char* data, size_t datasize, void* user_data)
+{
+    struct ClientInfo* wsCliCtx = (struct ClientInfo*)mg_get_user_connection_data(conn);
+
+    if ((opcode & 0xf) != MG_WEBSOCKET_OPCODE_TEXT) return 1;
+
+    bool finished = false;
+    g_Ext.NextFrame(WSServerMessage, { (char*)user_data, wsCliCtx->connectionNumber, "message", std::string(data), &finished });
+    while (!finished) { std::this_thread::sleep_for(std::chrono::milliseconds(50)); }
+    return 1;
+}
+
+static void ws_close_handler(const struct mg_connection* conn, void* user_data)
+{
+    (void)user_data;
+
+    struct ClientInfo* wsCliCtx = (struct ClientInfo*)mg_get_user_connection_data(conn);
+
+    bool finished = false;
+    g_Ext.NextFrame(WSServerMessage, { (char*)user_data, wsCliCtx->connectionNumber, "close", "", &finished });
+    while (!finished) { std::this_thread::sleep_for(std::chrono::milliseconds(50)); }
+
+    std::string uid = (char*)user_data;
+    if (wsConnections.find(uid) == wsConnections.end()) wsConnections[uid] = std::map<uint64_t, struct mg_connection*>{};
+    wsConnections[uid].erase(wsCliCtx->connectionNumber);
+
+    free(wsCliCtx);
+}
+
+
+bool WSExtension::OnPluginLoad(std::string pluginName, void* pluginState, PluginKind_t kind, std::string& error)
+{
+    EContext* ctx = (EContext*)pluginState;
+
+    ADD_CLASS("WS");
+
+    ADD_CLASS_FUNCTION("WS", "~WS", [](FunctionContext* context, ClassData* data) -> void {
+        if (data->HasData("server_uuids")) {
+            auto vec = data->GetData<std::vector<std::string>>("server_uuids");
+            for (std::string uuid : vec) {
+                mg_stop(internalWSServer[uuid]);
+                internalWSServer.erase(uuid);
+            }
+        }
+        });
+
+    ADD_CLASS_FUNCTION("WS", "StartListen", [](FunctionContext* context, ClassData* data) -> void {
+        int port = context->GetArgumentOr<int>(0, 1337);
+        if (port > 65535) return;
+
+        const char* SERVER_OPTIONS[] = {
+            "listening_ports", "27023",
+            nullptr, nullptr,
+        };
+
+        std::string uuid = get_uuid();
+
+        struct mg_callbacks callbacks = { 0 };
+        char* uid = strdup(uuid.c_str());
+
+        struct mg_init_data mg_start_init_data = { 0 };
+        mg_start_init_data.callbacks = &callbacks;
+        mg_start_init_data.user_data = uid;
+        mg_start_init_data.configuration_options = SERVER_OPTIONS;
+
+        struct mg_error_data mg_start_error_data = { 0 };
+        char errtxtbuf[256] = { 0 };
+        mg_start_error_data.text = errtxtbuf;
+        mg_start_error_data.text_buffer_size = sizeof(errtxtbuf);
+
+        struct mg_context* ctx = mg_start2(&mg_start_init_data, &mg_start_error_data);
+        if (!ctx) {
+            printf("[Websockets] An error has occured while trying to start WS Server: %s\n", errtxtbuf);
+            return context->SetReturn("00000000-0000-0000-0000-000000000000");
+        }
+
+        mg_set_websocket_handler_with_subprotocols(ctx, "/", &wsprot, ws_connect_handler, ws_ready_handler, ws_data_handler, ws_close_handler, uid);
+
+        internalWSServer[uuid] = ctx;
+
+        auto vec = data->GetDataOr<std::vector<std::string>>("server_uuids", std::vector<std::string>{});
+        vec.push_back(uuid);
+        data->SetData("server_uuids", vec);
+
+        context->SetReturn(uuid);
+
+        });
+
+    ADD_CLASS_FUNCTION("WS", "StopListen", [](FunctionContext* context, ClassData* data) -> void {
+        std::string server_uuid = context->GetArgumentOr<std::string>(0, "0");
+
+        auto vec = data->GetDataOr<std::vector<std::string>>("server_uuids", std::vector<std::string>{});
+        auto it = std::find(vec.begin(), vec.end(), server_uuid);
+        if (it == vec.end()) return;
+
+        vec.erase(it);
+        data->SetData("server_uuids", vec);
+
+        char* uid = (char*)mg_get_user_data(internalWSServer[server_uuid]);
+        free(uid);
+
+        mg_stop(internalWSServer[server_uuid]);
+
+        internalWSServer.erase(server_uuid);
+
+        });
+
+    ADD_CLASS_FUNCTION("WS", "SendServerMessageToClient", [](FunctionContext* context, ClassData* data) -> void {
+        std::string server_uuid = context->GetArgumentOr<std::string>(0, "0");
+        uint64_t client_id = context->GetArgumentOr<uint64_t>(1, 0);
+        std::string message = context->GetArgumentOr<std::string>(2, "");
+
+        if (wsConnections.find(server_uuid) == wsConnections.end()) wsConnections[server_uuid] = std::map<uint64_t, struct mg_connection*>{};
+        if (wsConnections[server_uuid].find(client_id) != wsConnections[server_uuid].end()) {
+            auto conn = wsConnections[server_uuid][client_id];
+            mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_TEXT, message.c_str(), message.size());
+        }
+        });
+
+    ADD_CLASS_FUNCTION("WS", "SendServerMessageToAllClients", [](FunctionContext* context, ClassData* data) -> void {
+        std::string server_uuid = context->GetArgumentOr<std::string>(0, "0");
+        std::string message = context->GetArgumentOr<std::string>(1, "");
+
+        if (wsConnections.find(server_uuid) == wsConnections.end()) wsConnections[server_uuid] = std::map<uint64_t, struct mg_connection*>{};
+        for (auto it = wsConnections[server_uuid].begin(); it != wsConnections[server_uuid].end(); ++it) {
+            mg_websocket_write(it->second, MG_WEBSOCKET_OPCODE_TEXT, message.c_str(), message.size());
+        }
+        });
+
+    ADD_CLASS_FUNCTION("WS", "TerminateClientConnectionOnServer", [](FunctionContext* context, ClassData* data) -> void {
+        std::string server_uuid = context->GetArgumentOr<std::string>(0, "0");
+        uint64_t client_id = context->GetArgumentOr<uint64_t>(1, 0);
+
+        if (wsConnections.find(server_uuid) == wsConnections.end()) wsConnections[server_uuid] = std::map<uint64_t, struct mg_connection*>{};
+        if (wsConnections[server_uuid].find(client_id) != wsConnections[server_uuid].end()) {
+            mg_websocket_write(wsConnections[server_uuid][client_id], MG_WEBSOCKET_OPCODE_CONNECTION_CLOSE, "", 0);
+            mg_close_connection(wsConnections[server_uuid][client_id]);
+        }
+        });
+
+    ADD_VARIABLE("_G", "websocket", MAKE_CLASS_INSTANCE_CTX(ctx, "WS", {}));
+
+    return true;
+}
+
+bool WSExtension::OnPluginUnload(std::string pluginName, void* pluginState, PluginKind_t kind, std::string& error)
 {
     return true;
 }
 
-void BaseExtension::AllExtensionsLoaded()
-{
-
-}
-
-void BaseExtension::AllPluginsLoaded()
-{
-
-}
-
-bool BaseExtension::OnPluginLoad(std::string pluginName, void* pluginState, PluginKind_t kind, std::string& error)
-{
-    return true;
-}
-
-bool BaseExtension::OnPluginUnload(std::string pluginName, void* pluginState, PluginKind_t kind, std::string& error)
-{
-    return true;
-}
-
-const char* BaseExtension::GetAuthor()
+const char* WSExtension::GetAuthor()
 {
     return "Swiftly Development Team";
 }
 
-const char* BaseExtension::GetName()
+const char* WSExtension::GetName()
 {
-    return "Base Extension";
+    return "WebSocket Extension";
 }
 
-const char* BaseExtension::GetVersion()
+const char* WSExtension::GetVersion()
 {
 #ifndef VERSION
     return "Local";
@@ -64,7 +318,7 @@ const char* BaseExtension::GetVersion()
 #endif
 }
 
-const char* BaseExtension::GetWebsite()
+const char* WSExtension::GetWebsite()
 {
-    return "https://swiftlycs2.net/";
+    return "https://swiftlys2.net/";
 }
