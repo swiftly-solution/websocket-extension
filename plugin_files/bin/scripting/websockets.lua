@@ -23,14 +23,14 @@ ws = {
 
     SendServerMessageToClient = function(_, server_uuid, client_id, message)
         if not message then message = "" end
-        if type(message) ~= "string" then message = json.encode(message) or "{}" end
+        if type(message) ~= "string" then message = (type(message) == "table" and (json.encode(message) or "{}") or tostring(message)) end
 
         websocket:SendServerMessageToClient(server_uuid, client_id, message)
     end,
 
     SendServerMessageToAllClients = function(_, server_uuid, message)
         if not message then message = "" end
-        if type(message) ~= "string" then message = json.encode(message) or "{}" end
+        if type(message) ~= "string" then message = (type(message) == "table" and (json.encode(message) or "{}") or tostring(message)) end
 
         websocket:SendServerMessageToAllClients(server_uuid, message)
     end,

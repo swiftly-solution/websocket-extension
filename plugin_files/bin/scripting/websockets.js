@@ -23,14 +23,14 @@ globalThis.ws = {
 
     SendServerMessageToClient: function (server_uuid, client_id, message) {
         if (!message) message = "";
-        if (typeof message != "string") message = JSON.stringify(message)
+        if (typeof message != "string") message = (typeof message == "object" ? JSON.stringify(message) : String(message))
 
         websocket.SendServerMessageToClient(server_uuid, client_id, message)
     },
 
     SendServerMessageToAllClients: function (server_uuid, message) {
         if (!message) message = "";
-        if (typeof message != "string") message = JSON.stringify(message)
+        if (typeof message != "string") message = (typeof message == "object" ? JSON.stringify(message) : String(message))
 
         websocket.SendServerMessageToAllClients(server_uuid, message)
     },
