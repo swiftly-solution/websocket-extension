@@ -89,7 +89,6 @@ for sdk_target in MMSPlugin.sdk_targets:
             "PLATFORM_64BITS",
             "META_IS_SOURCE2",
             "_GLIBCXX_USE_CXX11_ABI=0",
-            "OPENSSL_API_1_1",
         ]
     else:
         binary.compiler.cxxflags += [
@@ -105,6 +104,8 @@ for sdk_target in MMSPlugin.sdk_targets:
             "/Z7"
         ]
         binary.compiler.postlink += [
+            os.path.join(builder.sourcePath, 'vendor', 'openssl', 'libcrypto.lib'),
+            os.path.join(builder.sourcePath, 'vendor', 'openssl', 'libssl.lib'),
             "psapi.lib",
             "winmm.lib",
             "ws2_32.lib",
@@ -146,14 +147,15 @@ for sdk_target in MMSPlugin.sdk_targets:
             "META_IS_SOURCE2",
             "X64BITS",
             "PLATFORM_64BITS",
-            "NDEBUG"
+            "NDEBUG",
         ]
 
     binary.compiler.defines += [
         "HAVE_STRUCT_TIMESPEC",
         "BUILDING",
         "NO_SSL_DL",
-        "USE_WEBSOCKET"
+        "USE_WEBSOCKET",
+        "OPENSSL_API_1_1",
     ]
 
     if os.getenv("VERSION") != None:

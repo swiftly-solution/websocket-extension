@@ -70,6 +70,8 @@
         "xstring": "cpp",
         "codecvt": "cpp",
         "future": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "bn.h": "c",
+        "opensslv.h": "c"
     }
 }

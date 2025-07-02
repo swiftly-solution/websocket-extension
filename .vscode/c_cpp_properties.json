@@ -18,7 +18,9 @@
                 "_UNICODE",
                 "WIN32",
                 "COMPILER_GCC",
-                "META_IS_SOURCE2"
+                "META_IS_SOURCE2",
+                "NO_SSL_DL",
+                "OPENSSL_API_1_1"
             ],
             "cStandard": "c17",
             "cppStandard": "c++17",
