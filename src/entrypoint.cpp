@@ -217,6 +217,11 @@ static int ws_cdata_handler(struct mg_connection* conn, int opcode, char* data, 
 {
     struct ServerClientInfo* dt = (struct ServerClientInfo*)user_data;
 
+    if ((opcode & 0xf) == MG_WEBSOCKET_OPCODE_PING) {
+        mg_websocket_client_write(conn, MG_WEBSOCKET_OPCODE_PONG, data, datasize);
+        return 1;
+    }
+
     if ((opcode & 0xf) != MG_WEBSOCKET_OPCODE_TEXT) return 1;
 
     bool finished = false;
