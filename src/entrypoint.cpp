@@ -20,6 +20,13 @@ struct ClientInfo
     uint64_t connectionNumber;
 };
 
+struct ServerClientInfo
+{
+    char* server_uuid;
+    char* dns;
+    char* path;
+};
+
 struct ServerInfo
 {
     char* port;
@@ -36,6 +43,9 @@ CREATE_GLOBALVARS();
 
 std::map<std::string, struct mg_context*> internalWSServer;
 std::map<std::string, std::map<uint64_t, struct mg_connection*>> wsConnections;
+
+std::map<std::string, struct mg_connection*> internalWSClient;
+std::map<std::string, ServerClientInfo*> wsClientsData;
 
 ISource2Server* server = nullptr;
 
@@ -80,6 +90,12 @@ bool WSExtension::Unload(std::string& error)
         mg_stop(it->second);
     }
 
+    for (auto it = internalWSClient.begin(); it != internalWSClient.end(); ++it) {
+        mg_websocket_client_write(it->second, MG_WEBSOCKET_OPCODE_CONNECTION_CLOSE, nullptr, 0);
+
+        free(wsClientsData[it->first]);
+    }
+
     SH_REMOVE_HOOK_MEMFUNC(IServerGameDLL, PreWorldUpdate, server, this, &WSExtension::Hook_PreWorldUpdate, true);
 
     mg_exit_library();
@@ -121,7 +137,19 @@ void WSServerMessage(std::vector<std::any> args)
 
     std::any ret;
     TriggerEvent("websockets.ext", "OnWSServerMessage", { server_id, client_id, kind, message }, ret);
-    *finished = true;
+    if (finished) *finished = true;
+}
+
+void WSClientMessage(std::vector<std::any> args)
+{
+    std::string connection_uuid = std::any_cast<char*>(args[0]);
+    std::string kind = std::any_cast<const char*>(args[1]);
+    std::string message = std::any_cast<std::string>(args[2]);
+    bool* finished = std::any_cast<bool*>(args[3]);
+
+    std::any ret;
+    TriggerEvent("websockets.ext", "OnWSClientMessage", { connection_uuid, kind, message }, ret);
+    if (finished) *finished = true;
 }
 
 static int ws_connect_handler(const struct mg_connection* conn, void* user_data)
@@ -185,6 +213,26 @@ static void ws_close_handler(const struct mg_connection* conn, void* user_data)
     free(wsCliCtx);
 }
 
+static int ws_cdata_handler(struct mg_connection* conn, int opcode, char* data, size_t datasize, void* user_data)
+{
+    struct ServerClientInfo* dt = (struct ServerClientInfo*)user_data;
+
+    if ((opcode & 0xf) != MG_WEBSOCKET_OPCODE_TEXT) return 1;
+
+    bool finished = false;
+    g_Ext.NextFrame(WSClientMessage, { (char*)dt->server_uuid, "message", std::string(data, datasize), &finished });
+    while (!finished) { std::this_thread::sleep_for(std::chrono::milliseconds(50)); }
+    return 1;
+}
+
+static void ws_cclose_handler(const struct mg_connection* conn, void* user_data)
+{
+    struct ServerClientInfo* data = (struct ServerClientInfo*)user_data;
+
+    bool finished = false;
+    g_Ext.NextFrame(WSClientMessage, { (char*)data->server_uuid, "close", std::string(""), &finished });
+    while (!finished) { std::this_thread::sleep_for(std::chrono::milliseconds(50)); }
+}
 
 bool WSExtension::OnPluginLoad(std::string pluginName, void* pluginState, PluginKind_t kind, std::string& error)
 {
@@ -196,8 +244,26 @@ bool WSExtension::OnPluginLoad(std::string pluginName, void* pluginState, Plugin
         if (data->HasData("server_uuids")) {
             auto vec = data->GetData<std::vector<std::string>>("server_uuids");
             for (std::string uuid : vec) {
+                ServerInfo* ctx = (ServerInfo*)mg_get_user_data(internalWSServer[uuid]);
                 mg_stop(internalWSServer[uuid]);
+
+                free(ctx->port);
+                free(ctx->uuid);
+                free(ctx);
+
                 internalWSServer.erase(uuid);
+            }
+        }
+
+        if (data->HasData("client_uuids")) {
+            auto vec = data->GetData<std::vector<std::string>>("client_uuids");
+            for (std::string uuid : vec) {
+                mg_websocket_client_write(internalWSClient[uuid], MG_WEBSOCKET_OPCODE_CONNECTION_CLOSE, nullptr, 0);
+
+                free(wsClientsData[uuid]);
+
+                internalWSClient.erase(uuid);
+                wsClientsData.erase(uuid);
             }
         }
         });
@@ -233,6 +299,10 @@ bool WSExtension::OnPluginLoad(std::string pluginName, void* pluginState, Plugin
 
         struct mg_context* ctx = mg_start2(&mg_start_init_data, &mg_start_error_data);
         if (!ctx) {
+            free(serverCtx->port);
+            free(serverCtx->uuid);
+            free(serverCtx);
+
             printf("[Websockets] An error has occured while trying to start WS Server: %s\n", errtxtbuf);
             return context->SetReturn("00000000-0000-0000-0000-000000000000");
         }
@@ -299,7 +369,68 @@ bool WSExtension::OnPluginLoad(std::string pluginName, void* pluginState, Plugin
         if (wsConnections.find(server_uuid) == wsConnections.end()) wsConnections[server_uuid] = std::map<uint64_t, struct mg_connection*>{};
         if (wsConnections[server_uuid].find(client_id) != wsConnections[server_uuid].end()) {
             mg_websocket_write(wsConnections[server_uuid][client_id], MG_WEBSOCKET_OPCODE_CONNECTION_CLOSE, "", 0);
-            mg_close_connection(wsConnections[server_uuid][client_id]);
+        }
+        });
+
+    ADD_CLASS_FUNCTION("WS", "ConnectToServer", [](FunctionContext* context, ClassData* data) -> void {
+        std::string dns = context->GetArgumentOr<std::string>(0, "example.com");
+        int port = context->GetArgumentOr<int>(1, 80);
+        bool isSecure = context->GetArgumentOr<bool>(2, false);
+        std::string path = context->GetArgumentOr<std::string>(3, "/ws");
+
+        std::string uuid = get_uuid();
+        char* uid = strdup(uuid.c_str());
+
+        struct ServerClientInfo* pClientData = (struct ServerClientInfo*)malloc(sizeof(struct ServerClientInfo));
+        pClientData->server_uuid = uid;
+        pClientData->dns = strdup(dns.c_str());
+        pClientData->path = strdup(path.c_str());
+
+        char err_buf[100] = { 0 };
+        struct mg_connection* conn = mg_connect_websocket_client(pClientData->dns, port, int(isSecure), err_buf, sizeof(err_buf), pClientData->path, nullptr, ws_cdata_handler, ws_cclose_handler, pClientData);
+        if (!conn) {
+            printf("[Websockets] An error has occured while trying to start WS Client: %s\n", err_buf);
+            free(pClientData);
+            return context->SetReturn("00000000-0000-0000-0000-000000000000");
+        }
+
+        internalWSClient[uuid] = conn;
+        wsClientsData[uuid] = pClientData;
+
+        auto vec = data->GetDataOr<std::vector<std::string>>("client_uuids", std::vector<std::string>{});
+        vec.push_back(uuid);
+        data->SetData("client_uuids", vec);
+
+        context->SetReturn(uuid);
+        });
+
+    ADD_CLASS_FUNCTION("WS", "DisconnectFromServer", [](FunctionContext* context, ClassData* data) -> void {
+        std::string client_uuid = context->GetArgumentOr<std::string>(0, "0");
+
+        auto vec = data->GetDataOr<std::vector<std::string>>("client_uuids", std::vector<std::string>{});
+        auto it = std::find(vec.begin(), vec.end(), client_uuid);
+        if (it == vec.end()) return;
+
+        vec.erase(it);
+        data->SetData("client_uuids", vec);
+
+        ServerClientInfo* ctx = wsClientsData[client_uuid];
+        mg_websocket_client_write(internalWSClient[client_uuid], MG_WEBSOCKET_OPCODE_CONNECTION_CLOSE, nullptr, 0);
+
+        free(ctx);
+
+        internalWSClient.erase(client_uuid);
+        wsClientsData.erase(client_uuid);
+
+        });
+
+    ADD_CLASS_FUNCTION("WS", "SendMessageToServer", [](FunctionContext* context, ClassData* data) -> void {
+        std::string client_uuid = context->GetArgumentOr<std::string>(0, "0");
+        std::string message = context->GetArgumentOr<std::string>(1, "");
+
+        if (internalWSClient.find(client_uuid) != internalWSClient.end()) {
+            auto client = internalWSClient[client_uuid];
+            mg_websocket_client_write(client, MG_WEBSOCKET_OPCODE_TEXT, message.c_str(), message.size());
         }
         });
 
