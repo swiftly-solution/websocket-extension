@@ -163,6 +163,10 @@ for sdk_target in MMSPlugin.sdk_targets:
             "VERSION=\"" + os.getenv("VERSION") + "\""
         ]
 
+    binary.compiler.includes += [
+        os.path.join(builder.sourcePath, 'vendor'),
+    ]
+
     binary.compiler.cxxincludes += [
         os.path.join(builder.sourcePath, 'vendor'),
         os.path.join(builder.sourcePath, 'vendor', 'embedder', 'src'),

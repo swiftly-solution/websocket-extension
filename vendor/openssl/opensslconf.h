@@ -20,14 +20,14 @@ extern "C" {
 # error OPENSSL_ALGORITHM_DEFINES no longer supported
 #endif
 
-/*
- * OpenSSL was configured with the following options:
- */
+    /*
+     * OpenSSL was configured with the following options:
+     */
 
 #ifndef OPENSSL_SYS_WIN64A
 # define OPENSSL_SYS_WIN64A 1
 #endif
-#define OPENSSL_MIN_API 0x10100000L
+#define OPENSSL_MIN_API 0x10000000L
 #ifndef OPENSSL_NO_COMP
 # define OPENSSL_NO_COMP
 #endif
@@ -111,18 +111,18 @@ extern "C" {
 #endif
 
 
-/*
- * Sometimes OPENSSSL_NO_xxx ends up with an empty file and some compilers
- * don't like that.  This will hopefully silence them.
- */
+     /*
+      * Sometimes OPENSSSL_NO_xxx ends up with an empty file and some compilers
+      * don't like that.  This will hopefully silence them.
+      */
 #define NON_EMPTY_TRANSLATION_UNIT static void *dummy = &dummy;
 
-/*
- * Applications should use -DOPENSSL_API_COMPAT=<version> to suppress the
- * declarations of functions deprecated in or before <version>. Otherwise, they
- * still won't see them if the library has been built to disable deprecated
- * functions.
- */
+      /*
+       * Applications should use -DOPENSSL_API_COMPAT=<version> to suppress the
+       * declarations of functions deprecated in or before <version>. Otherwise, they
+       * still won't see them if the library has been built to disable deprecated
+       * functions.
+       */
 #ifndef DECLARE_DEPRECATED
 # define DECLARE_DEPRECATED(f)   f;
 # ifdef __GNUC__
@@ -157,10 +157,10 @@ extern "C" {
 # define OPENSSL_API_COMPAT OPENSSL_MIN_API
 #endif
 
-/*
- * Do not deprecate things to be deprecated in version 1.2.0 before the
- * OpenSSL version number matches.
- */
+       /*
+        * Do not deprecate things to be deprecated in version 1.2.0 before the
+        * OpenSSL version number matches.
+        */
 #if OPENSSL_VERSION_NUMBER < 0x10200000L
 # define DEPRECATEDIN_1_2_0(f)   f;
 #elif OPENSSL_API_COMPAT < 0x10200000L
@@ -187,7 +187,7 @@ extern "C" {
 # define DEPRECATEDIN_0_9_8(f)
 #endif
 
-/* Generate 80386 code? */
+        /* Generate 80386 code? */
 #undef I386_ONLY
 
 #undef OPENSSL_UNISTD
@@ -200,7 +200,7 @@ extern "C" {
  */
 #if !defined(OPENSSL_SYS_UEFI)
 # undef BN_LLONG
-/* Only one for the following should be defined */
+ /* Only one for the following should be defined */
 # undef SIXTY_FOUR_BIT_LONG
 # define SIXTY_FOUR_BIT
 # undef THIRTY_TWO_BIT

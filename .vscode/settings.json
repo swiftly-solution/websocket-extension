@@ -72,6 +72,8 @@
         "future": "cpp",
         "variant": "cpp",
         "bn.h": "c",
-        "opensslv.h": "c"
+        "opensslv.h": "c",
+        "x509.h": "c",
+        "bio.h": "c"
     }
 }
