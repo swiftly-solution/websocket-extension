@@ -406,6 +406,8 @@ bool WSExtension::OnPluginLoad(std::string pluginName, void* pluginState, Plugin
         vec.push_back(uuid);
         data->SetData("client_uuids", vec);
 
+        g_Ext.NextFrame(WSClientMessage, { (char*)pClientData->server_uuid, "ready", std::string(""), (bool*)nullptr });
+
         context->SetReturn(uuid);
         });
 
