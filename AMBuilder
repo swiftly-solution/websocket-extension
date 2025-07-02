@@ -89,6 +89,7 @@ for sdk_target in MMSPlugin.sdk_targets:
             "PLATFORM_64BITS",
             "META_IS_SOURCE2",
             "_GLIBCXX_USE_CXX11_ABI=0",
+            "OPENSSL_API_1_1",
         ]
     else:
         binary.compiler.cxxflags += [
@@ -151,7 +152,7 @@ for sdk_target in MMSPlugin.sdk_targets:
     binary.compiler.defines += [
         "HAVE_STRUCT_TIMESPEC",
         "BUILDING",
-        "NO_SSL",
+        "NO_SSL_DL",
         "USE_WEBSOCKET"
     ]
 

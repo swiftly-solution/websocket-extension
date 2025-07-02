@@ -20,6 +20,12 @@ struct ClientInfo
     uint64_t connectionNumber;
 };
 
+struct ServerInfo
+{
+    char* port;
+    char* uuid;
+};
+
 static const char subprotocol_bin[] = "Company.ProtoName.bin";
 static const char subprotocol_json[] = "Company.ProtoName.json";
 static const char* subprotocols[] = { subprotocol_bin, subprotocol_json, NULL };
@@ -58,7 +64,7 @@ std::string get_uuid()
 EXT_EXPOSE(g_Ext);
 bool WSExtension::Load(std::string& error, SourceHook::ISourceHook* SHPtr, ISmmAPI* ismm, bool late)
 {
-    mg_init_library(0);
+    mg_init_library(MG_FEATURES_SSL);
     SAVE_GLOBALVARS();
 
     GET_IFACE_ANY(GetServerFactory, server, ISource2Server, INTERFACEVERSION_SERVERGAMEDLL);
@@ -157,7 +163,7 @@ static int ws_data_handler(struct mg_connection* conn, int opcode, char* data, s
     if ((opcode & 0xf) != MG_WEBSOCKET_OPCODE_TEXT) return 1;
 
     bool finished = false;
-    g_Ext.NextFrame(WSServerMessage, { (char*)user_data, wsCliCtx->connectionNumber, "message", std::string(data), &finished });
+    g_Ext.NextFrame(WSServerMessage, { (char*)user_data, wsCliCtx->connectionNumber, "message", std::string(data, datasize), &finished });
     while (!finished) { std::this_thread::sleep_for(std::chrono::milliseconds(50)); }
     return 1;
 }
@@ -200,15 +206,20 @@ bool WSExtension::OnPluginLoad(std::string pluginName, void* pluginState, Plugin
         int port = context->GetArgumentOr<int>(0, 1337);
         if (port > 65535) return;
 
+        struct ServerInfo* serverCtx = (struct ServerInfo*)malloc(sizeof(struct ServerInfo));
+
+        std::string uuid = get_uuid();
+        char* uid = strdup(uuid.c_str());
+
+        serverCtx->port = strdup(std::to_string(port).c_str());
+        serverCtx->uuid = uid;
+
         const char* SERVER_OPTIONS[] = {
-            "listening_ports", "27023",
+            "listening_ports", serverCtx->port,
             nullptr, nullptr,
         };
 
-        std::string uuid = get_uuid();
-
         struct mg_callbacks callbacks = { 0 };
-        char* uid = strdup(uuid.c_str());
 
         struct mg_init_data mg_start_init_data = { 0 };
         mg_start_init_data.callbacks = &callbacks;
@@ -248,8 +259,10 @@ bool WSExtension::OnPluginLoad(std::string pluginName, void* pluginState, Plugin
         vec.erase(it);
         data->SetData("server_uuids", vec);
 
-        char* uid = (char*)mg_get_user_data(internalWSServer[server_uuid]);
-        free(uid);
+        ServerInfo* ctx = (ServerInfo*)mg_get_user_data(internalWSServer[server_uuid]);
+        free(ctx->port);
+        free(ctx->uuid);
+        free(ctx);
 
         mg_stop(internalWSServer[server_uuid]);
 
