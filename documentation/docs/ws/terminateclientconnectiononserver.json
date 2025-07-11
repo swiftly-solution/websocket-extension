@@ -1,0 +1,11 @@
+{
+    "kind": "function",
+    "function": "TerminateClientConnectionOnServer",
+    "description": "Terminates a client connection to the websocket server.",
+    "arguments": {
+        "server_uuid": "string",
+        "client_id": "uint64"
+    },
+    "return": "void",
+    "games": "all"
+}

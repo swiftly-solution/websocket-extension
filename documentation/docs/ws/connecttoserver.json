@@ -1,0 +1,18 @@
+{
+    "kind": "function",
+    "function": "ConnectToServer",
+    "description": "Creates a WebSocket Client connection.",
+    "arguments": {
+        "port": "uint32",
+        "callback": {
+            "arguments": {
+                "connection_uuid": "string",
+                "kind": "string",
+                "message": "string"
+            },
+            "return": "void"
+        }
+    },
+    "return": "string",
+    "games": "all"
+}

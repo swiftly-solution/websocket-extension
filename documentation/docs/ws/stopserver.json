@@ -1,0 +1,10 @@
+{
+    "kind": "function",
+    "function": "StopServer",
+    "description": "Stops a WebSocket Server.",
+    "arguments": {
+        "server_uuid": "string"
+    },
+    "return": "void",
+    "games": "all"
+}

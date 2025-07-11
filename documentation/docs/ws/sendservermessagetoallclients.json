@@ -1,0 +1,11 @@
+{
+    "kind": "function",
+    "function": "SendServerMessageToAllClients",
+    "description": "Sends a message to all clients.",
+    "arguments": {
+        "server_uuid": "string",
+        "message": "any"
+    },
+    "return": "void",
+    "games": "all"
+}

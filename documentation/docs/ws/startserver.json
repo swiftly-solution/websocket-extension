@@ -1,0 +1,19 @@
+{
+    "kind": "function",
+    "function": "StartServer",
+    "description": "Creates a WebSocket Server.",
+    "arguments": {
+        "port": "uint32",
+        "callback": {
+            "arguments": {
+                "server_uuid": "string",
+                "client_id": "uint64",
+                "kind": "string",
+                "message": "string"
+            },
+            "return": "void"
+        }
+    },
+    "return": "string",
+    "games": "all"
+}

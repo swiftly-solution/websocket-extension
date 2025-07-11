@@ -1,0 +1,10 @@
+{
+    "kind": "function",
+    "function": "StopConnectionToServer",
+    "description": "Stops a WebSocket Client connection.",
+    "arguments": {
+        "connection_uuid": "string"
+    },
+    "return": "void",
+    "games": "all"
+}

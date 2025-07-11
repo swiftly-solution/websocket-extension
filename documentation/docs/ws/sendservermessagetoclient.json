@@ -1,0 +1,12 @@
+{
+    "kind": "function",
+    "function": "SendServerMessageToClient",
+    "description": "Sends a message to a client.",
+    "arguments": {
+        "server_uuid": "string",
+        "client_id": "uint64",
+        "message": "any"
+    },
+    "return": "void",
+    "games": "all"
+}
