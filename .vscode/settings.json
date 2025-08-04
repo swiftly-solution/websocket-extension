@@ -74,6 +74,7 @@
         "bn.h": "c",
         "opensslv.h": "c",
         "x509.h": "c",
-        "bio.h": "c"
+        "bio.h": "c",
+        "typeindex": "cpp"
     }
 }

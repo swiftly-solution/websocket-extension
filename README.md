@@ -19,8 +19,7 @@
 ### Build Requirements
 -   [hl2sdk](https://github.com/alliedmodders/hl2sdk/tree/cs2) (Downloads automatically with the git cloning using Recurse Submodules)
 -   [metamod-source](https://github.com/alliedmodders/metamod-source) (Downloads automatically with the git cloning using Recurse Submodules)
--   [python3](https://www.python.org/)
--   [AMBuild](https://github.com/alliedmodders/ambuild) (MAKE SURE `ambuild` COMMAND IS AVAILABLE VIA `PATH` FOR WINDOWS)
+-   [XMake](https://xmake.io/)
 ---
 ### For Developers
 - [Documentation](https://swiftlys2.net/docs-exts)
@@ -38,4 +37,10 @@ git clone --recurse-submodules https://github.com/swiftly-solution/websocket-ext
 ```
 ./setup.ps1 - Windows
 ./setup.sh - Linux
+```
+
+#### Build using Docker
+
+```
+docker run --rm -it -e "FOLDER=ext" -e "GAME=cs2" -v .:/ext ghcr.io/swiftly-solution/swiftly:cross-compiler
 ```
