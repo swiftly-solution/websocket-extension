@@ -3,7 +3,10 @@
     "function": "ConnectToServer",
     "description": "Creates a WebSocket Client connection.",
     "arguments": {
+        "dns": "string",
         "port": "uint32",
+        "isSecure": "bool",
+        "path": "string",
         "callback": {
             "arguments": {
                 "connection_uuid": "string",

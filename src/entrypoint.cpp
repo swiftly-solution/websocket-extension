@@ -258,6 +258,8 @@ bool WSExtension::OnPluginLoad(std::string pluginName, void* pluginState, Plugin
 
     ADD_CLASS("WS");
 
+    ADD_CLASS_FUNCTION("WS", "WS", [](FunctionContext* context, ClassData* data) -> void {});
+
     ADD_CLASS_FUNCTION("WS", "~WS", [](FunctionContext* context, ClassData* data) -> void {
         if (data->HasData("server_uuids")) {
             auto vec = data->GetData<std::vector<std::string>>("server_uuids");
